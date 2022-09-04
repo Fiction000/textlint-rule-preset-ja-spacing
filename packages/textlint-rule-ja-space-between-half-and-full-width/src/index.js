@@ -26,7 +26,7 @@ function reporter(context, options = {}) {
     const lintStyledNode = options.lintStyledNode !== undefined
         ? options.lintStyledNode
         : defaultOptions.lintStyledNode;
-    assert(spaceOption === "always" || spaceOption === "never", `"space" options should be "always" or "never".`);
+    assert(spaceOption === "always" || spaceOption === "never" || spaceOption === "after", `"space" options should be "always" or "never".`);
     /**
      * `text`を対象に例外オプションを取り除くfilter関数を返す
      * @param {string} text テスト対象のテキスト全体
@@ -79,6 +79,20 @@ function reporter(context, options = {}) {
         betweenHanAndZen.filter(createFilter(text, 1)).forEach(reportMatch);
         betweenZenAndHan.filter(createFilter(text, 0)).forEach(reportMatch);
     };
+
+    // After: アルファベットの後で全角が来る場合だけスペースを入れる
+    const needSpaceAfter = (node, text) => {
+        const betweenHanAndZen = matchCaptureGroupAll(text, /([A-Za-z0-9])(?:[、。]|[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]|[\uD840-\uD87F][\uDC00-\uDFFF]|[ぁ-んァ-ヶ])/);
+        const reportMatch = (match) => {
+            const {index} = match;
+            report(node, new RuleError("原則として、半角文字の後にはスペースを入れます。", {
+                index: match.index,
+                fix: fixer.replaceTextRange([index + 1, index + 1], " ")
+            }));
+        };
+        betweenHanAndZen.filter(createFilter(text, 1)).forEach(reportMatch);
+        betweenZenAndHan.filter(createFilter(text, 0)).forEach(reportMatch);
+    };
     return {
         [Syntax.Str](node){
             if (!lintStyledNode && !helper.isPlainStrNode(node)) {
@@ -90,6 +104,8 @@ function reporter(context, options = {}) {
                 needSpaceBetween(node, text)
             } else if (spaceOption === "never") {
                 noSpaceBetween(node, text);
+            } else if (spaceOption === "after") {
+                needSpaceAfter(node, text);
             }
 
         }
